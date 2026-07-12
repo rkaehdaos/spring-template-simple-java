@@ -40,10 +40,12 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 이 프로젝트의 핵심 설정이며 깨지기 쉬운 부분:
 
 - **Annotation processor 순서가 중요**: `lombok` → `lombok-mapstruct-binding` → `mapstruct-processor`. `build.gradle.kts`의 main/test 양쪽 모두 이 순서를 유지해야 MapStruct가 Lombok 생성 getter/builder를 인식한다.
-- 매퍼는 `@Mapper(componentModel = "spring")`으로 선언하고 Spring `Converter<S, T>`를 구현한다. mapstruct-spring-extensions가 이를 보고 `ConversionServiceAdapter`를 생성한다.
+- 매퍼 정책은 `mapper/CentralMapperConfig.java`의 `@MapperConfig`로 중앙화한다(`componentModel = SPRING`, `injectionStrategy = CONSTRUCTOR`, **`unmappedTargetPolicy = ERROR`**). 각 매퍼는 `@Mapper(config = CentralMapperConfig.class)`로 상속받는다. ERROR 정책이므로 매핑 누락은 컴파일 오류이며, 의도적으로 무시할 필드는 `@Mapping(target = "x", ignore = true)`로 명시해야 한다. `@MapperConfig`(mapstruct-processor)와 `@SpringMapperConfig`(mapstruct-spring-extensions)는 관심사가 달라 별도 파일로 유지한다.
 - `mapper/MapstructSpringConfig.java`의 `@SpringMapperConfig`가 adapter 생성 위치를 결정한다. 이 클래스가 mapper 패키지(컴포넌트 스캔 범위 안)에 있어야 adapter가 빈으로 등록된다 — 삭제/이동 금지.
-- Lombok binding 검증을 위해 매핑 대상 모델은 record가 아닌 Lombok `@Getter`/`@Builder` 클래스를 사용한다 (record는 accessor를 컴파일러가 직접 생성하므로 binding 동작이 증명되지 않음).
-- 연동 검증 테스트: `SampleMapperUnitTest`(스프링 없이 processor/binding 검증), `MapstructSpringIntegrationTest`(빈 등록·ConversionService 자동 등록 검증).
+- 제네릭 매퍼 계층: `mapper/DtoMapper<E, D>`(읽기 전용: toDto)와 이를 상속하는 `mapper/EntityMapper<D, E>`(양방향: toEntity + `@Named("partialUpdate")` 부분 갱신). 구체 매퍼는 `SampleEntityMapper`(엔티티 ↔ DTO 양방향, non-Converter)와 `SampleMapper`(Converter 구현, mapstruct-spring-extensions adapter 증명용)로 나뉜다.
+- **오버라이드 시 어노테이션 비상속 주의**: 비대칭 필드(예: `name` ↔ `fullName`) 때문에 제네릭 메서드를 `@Override`하면 상위 인터페이스의 `@Named`/`@BeanMapping`이 병합되지 않는다. `partialUpdate` 오버라이드에서 `@Named`/`@BeanMapping(...IGNORE)`/`@Mapping`을 모두 다시 선언해야 한다. `partialUpdate`의 null 스킵은 boxed 타입 필드에만 동작하므로 `SampleEntityDto.age`는 `Integer`를 쓴다.
+- Lombok binding 검증을 위해 매핑 대상 모델은 record가 아닌 Lombok 클래스를 쓴다: 불변 모델은 `@Getter`/`@Builder`(getter/builder 방향), JPA 엔티티 `domain/SampleEntity`는 `@Getter`/`@Setter`/`@NoArgsConstructor`(setter 방향 binding + `@MappingTarget` 부분 갱신 지원). 엔티티는 identity 함정 회피를 위해 `@Data`/`@EqualsAndHashCode`/`@Builder`를 쓰지 않는다.
+- 연동 검증 테스트: `SampleMapperUnitTest`·`SampleEntityMapperUnitTest`(스프링 없이 processor/binding·partialUpdate 검증), `MapstructSpringIntegrationTest`(빈 등록·ConversionService 자동 등록·config 상속 검증).
 
 ## 기타
 

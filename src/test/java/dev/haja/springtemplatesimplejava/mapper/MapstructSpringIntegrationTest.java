@@ -1,7 +1,9 @@
 package dev.haja.springtemplatesimplejava.mapper;
 
+import dev.haja.springtemplatesimplejava.domain.SampleEntity;
 import dev.haja.springtemplatesimplejava.dto.Sample;
 import dev.haja.springtemplatesimplejava.dto.SampleDto;
+import dev.haja.springtemplatesimplejava.dto.SampleEntityDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     <li>{@link SampleMapper} 빈 주입 → {@code componentModel = "spring"} 증명</li>
  *     <li>{@link ConversionServiceAdapter} 빈 주입 → mapstruct-spring-annotations + extensions 증명</li>
  *     <li>{@link ConversionService} 등록 → Converter 빈이 자동 등록됨을 증명</li>
+ *     <li>{@link SampleEntityMapper} 빈 주입 → {@code @Mapper(config = CentralMapperConfig.class)}가
+ *         componentModel=spring 정책을 상속해 빈으로 등록됨을 증명</li>
  * </ul>
  */
 @SpringBootTest
@@ -29,6 +33,9 @@ class MapstructSpringIntegrationTest {
 
     @Autowired
     ConversionService conversionService;
+
+    @Autowired
+    SampleEntityMapper sampleEntityMapper;
 
     private Sample sample() {
         return Sample.builder().id(1L).name("kai").age(30).build();
@@ -63,5 +70,20 @@ class MapstructSpringIntegrationTest {
 
         assertThat(dto).isNotNull();
         assertThat(dto.getFullName()).isEqualTo("kai");
+    }
+
+    @Test
+    @DisplayName("SampleEntityMapper가 config 상속으로 스프링 빈으로 등록되어 매핑한다")
+    void entityMapperIsRegisteredAsSpringBean() {
+        SampleEntity entity = new SampleEntity();
+        entity.setId(1L);
+        entity.setName("kai");
+        entity.setAge(30);
+
+        SampleEntityDto dto = sampleEntityMapper.toDto(entity);
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getFullName()).isEqualTo("kai");
+        assertThat(dto.getAge()).isEqualTo(30);
     }
 }
