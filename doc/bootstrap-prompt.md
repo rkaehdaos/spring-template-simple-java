@@ -14,7 +14,8 @@ Claude Opus/Sonnet 급 모델이 이 문서만 보고 프로젝트 전체를 재
    붙여넣은 뒤 대화로 이름을 알려준다.
 4. 완료 후 §7 "완료 기준 체크리스트"가 모두 만족되는지 확인한다.
 
-> **스냅샷 기준**: 2026-07-12, 원본 저장소 커밋 `ff761a8`(feat: JHipster 제네릭 EntityMapper 패턴 도입) 시점의 워킹트리.
+> **스냅샷 기준**: 2026-07-12, 원본 저장소 커밋 `ff761a8`(feat: JHipster 제네릭 EntityMapper 패턴 도입) 시점의 워킹트리에
+> 이후 정비분(inert `kapt` 설정 제거, `PULL_REQUEST_TEMPLATE.md`의 `.github/` 이동 및 백엔드 Java 전용 개편)을 반영한 상태.
 > 원본 템플릿이 갱신되면 이 문서도 함께 갱신할 것.
 
 ---
@@ -46,7 +47,8 @@ Claude Opus/Sonnet 급 모델이 이 문서만 보고 프로젝트 전체를 재
 4. **Spring Initializr(start.spring.io) 사용 금지.** 모든 파일은 이 문서에서 직접 생성한다.
 5. 의존성 추가/제거 금지. `build.gradle.kts`의 annotationProcessor **선언 순서**를 절대 바꾸지 않는다 (main/test 양쪽 모두).
 6. 각 파일은 마지막 줄 뒤 개행 문자(newline)로 끝나게 저장한다.
-7. 단계 실행 중 실패하면 §6의 진단표를 먼저 확인하고, 원인이 문서와의 불일치라면 해당 파일을 문서 원문과 대조해 수정한다.
+7. **치환 완료 후 생성된 어떤 파일에도 `{{`(잔여 플레이스홀더)가 남아 있으면 안 된다.** §5에서 기계적으로 검증한다.
+8. 단계 실행 중 실패하면 §6의 진단표를 먼저 확인하고, 원인이 문서와의 불일치라면 해당 파일을 문서 원문과 대조해 수정한다.
 
 ## §1. 파라미터와 치환 규칙
 
@@ -76,6 +78,23 @@ Claude Opus/Sonnet 급 모델이 이 문서만 보고 프로젝트 전체를 재
   부분 문자열에는 매칭되지 않으므로 그런 합성어는 동작한다. 다만 혼동을 피하려면
   프로젝트 이름에 이 세 단어를 아예 쓰지 않는 것을 권장한다.)
 
+### 1.3 도출값 보고 및 승인 (파일 생성 전 필수 관문)
+
+유효성 검증을 통과하면, **§3 파일 생성을 시작하기 전에** §1.1 규칙으로 도출한 4개 값을 아래 표 형식으로 사용자에게 보고하고 승인을 받아라. 특히 `APP_CLASS`의 PascalCase 도출은 실수가 잦으므로(예: `my-shop-api` → 올바른 `MyShopApiApplication`), 파일 31개를 생성하기 전에 사람이 확인할 수 있게 한다.
+
+```text
+도출값을 확인해 주세요. 이대로 진행할까요?
+
+| 항목 | 값 |
+|---|---|
+| PROJECT_NAME | my-shop-api |
+| BASE_PACKAGE | dev.haja.myshopapi |
+| BASE_PACKAGE_PATH | dev/haja/myshopapi |
+| APP_CLASS | MyShopApiApplication |
+```
+
+사용자가 값을 수정하거나 승인하기 전에는 §3으로 진행하지 않는다.
+
 ## §2. 사전 조건 확인
 
 ```bash
@@ -98,12 +117,12 @@ git --version
 {{PROJECT_NAME}}/
 ├── .gitattributes
 ├── .github/
+│   ├── PULL_REQUEST_TEMPLATE.md
 │   └── pmd/
 │       └── ruleset.xml
 ├── .gitignore
 ├── .gitmessage.txt
 ├── CLAUDE.md
-├── PULL_REQUEST_TEMPLATE.md
 ├── build.gradle.kts
 ├── gradle.properties
 ├── gradle/
@@ -221,7 +240,6 @@ Desktop.ini
 ### claude code ###
 .claude/
 plans/
-doc
 
 ### jdx.mise ###
 mise.toml
@@ -350,10 +368,6 @@ org.gradle.jvmargs=-Dfile.encoding=UTF-8 \
 # 2. 의존성/플러그인 버전 정보
 # - Gradle Version Catalog로 이전: gradle/libs.versions.toml 참조
 #   언어/프레임워크/라이브러리/플러그인 버전을 [versions]/[libraries]/[plugins]에서 일괄 관리
-
-# KAPT 설정 (버전이 아닌 빌드 동작 설정이므로 여기서 관리)
-kapt.include.compile.classpath=false
-kapt.incremental.apt=true
 
 # 3. 환경별 설정 (Environment-specific Configuration)
 #  - 개발/스테이징/프로덕션 환경에 따라 달라지는 설정
@@ -1221,7 +1235,7 @@ class MapstructSpringIntegrationTest {
 
 ### §3.30 `CLAUDE.md`
 
-새 프로젝트에서 Claude Code가 사용할 작업 지침. 원본 템플릿과 동일하며 패키지 경로만 치환된다.
+새 프로젝트에서 Claude Code가 사용할 작업 지침. 원본 템플릿과 거의 동일하되, 패키지 경로가 치환되고, 원본 저장소 로컬에만 존재하는 `plans/` 관련 안내는 제외한다(신규 프로젝트에는 아직 `plans/`가 없다).
 
 ````markdown
 # CLAUDE.md
@@ -1276,183 +1290,67 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 ## 기타
 
 - Hibernate ORM Gradle 플러그인(`org.hibernate.orm`)이 적용되어 있으나 `hibernate { enhancement {} }` 설정 블록이 없어 bytecode enhancement는 실제로 수행되지 않는다 (빌드된 엔티티 클래스에 `$$_hibernate_` 멤버 없음). enhancement가 필요해지면 `build.gradle.kts`에 해당 블록을 추가할 것.
-- `plans/` 디렉터리에 과거 작업 계획 문서가 있다. 설정 변경의 배경이 궁금할 때 참고.
-- PR 작성 시 저장소 루트의 `PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
+- PR 작성 시 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
 ````
 
-### §3.31 `PULL_REQUEST_TEMPLATE.md`
+### §3.31 `.github/PULL_REQUEST_TEMPLATE.md`
 
-저장소 루트에 둔다 (GitHub이 루트의 이 파일명을 인식한다).
+`.github/` 하위에 둔다 (GitHub이 `.github/PULL_REQUEST_TEMPLATE.md`를 인식한다). 이 템플릿은 백엔드 Java 단독 프로젝트 기준이다.
 
 ````markdown
-# Pull Request Template
+# Pull Request
 
-## 📋 JIRA 티켓 / Issue
-**JIRA:** [SMART-XXX](링크 첨부)
-**(선택적) 깃허브 이슈 Issues:** #issue_number
+## 관련 이슈 / Related Issue
+Closes #
 
 ---
 
-## 🏷️ PR 타입 / Change Type
+## PR 타입 / Change Type
 <!-- 해당하는 항목에 체크 -->
 - [ ] ✨ **Feature** - 새로운 기능 추가
 - [ ] 🐛 **Bug Fix** - 버그 수정
 - [ ] ♻️ **Refactor** - 코드 리팩토링
-- [ ] 🎨 **Style** - 코드 포맷팅, 세미콜론 누락 등
 - [ ] 📝 **Docs** - 문서 수정
 - [ ] ⚡ **Performance** - 성능 개선
 - [ ] ✅ **Test** - 테스트 코드 추가/수정
 - [ ] 🔧 **Chore** - 빌드 과정, 보조 도구 변경
 - [ ] 🔒 **Security** - 보안 관련 변경
 
-## 🎯 영향 범위 / Scope
-- [ ] 🎨 **Frontend** - React/TypeScript
-- [ ] 🛠️ **Backend** - Spring Boot/Kotlin
-- [ ] 📊 **Database** - Schema/Migration
-- [ ] 🔧 **Config** - 설정 파일 변경
-- [ ] 📖 **Documentation**
-
 ---
 
-## 📋 작업 내용 / Summary
-### 간단 요약 / Brief Description
-<!-- 이 PR에서 수행한 작업을 간단하게 설명해 주세요 -->
+## 요약 / Summary
+<!-- 이 PR에서 수행한 작업과 그 이유(무엇을, 왜)를 간단히 설명해 주세요 -->
 
-### 상세 변경사항 / Detailed Changes
-<!-- 주요 변경사항을 구체적으로 작성해 주세요 -->
-- 
+## 변경사항 / Changes
+<!-- 주요 변경사항을 bullet로 작성해 주세요 -->
 -
 -
 
-### 동기 및 배경 / Motivation
-<!-- 왜 이 변경이 필요한지 설명해 주세요 -->
+---
+
+## 테스트 / Testing
+- [ ] `./gradlew build` 성공 (테스트 + PMD 포함)
+- [ ] 수동 확인 완료 (필요시 아래에 방법 기재)
+
+<!-- 수동 확인이 필요한 경우 재현 방법을 적어 주세요 -->
 
 ---
 
-## 🧪 테스트 / Testing
-### 테스트 방법 / How to Test
-<!-- 이 변경사항을 어떻게 테스트할 수 있는지 설명해 주세요 -->
-1.
-2.
-3.
-
-### 테스트 결과 / Test Results
-- [ ] Unit Test 통과
-- [ ] Integration Test 통과
-- [ ] Manual Test 완료
+## 체크리스트 / Checklist
+- [ ] 커밋 메시지가 `.gitmessage.txt` 규칙을 따릅니다
+- [ ] 코드 리뷰가 가능한 상태입니다 (Conflict 해결됨)
+- [ ] 관련 문서(CLAUDE.md 등)를 갱신했습니다 (필요시)
+- [ ] DB 스키마·설정 변경을 검토했습니다 (필요시)
 
 ---
 
-## ✅ 체크리스트 / Checklist
-
-### 공통 / Common
-- [ ] 🔍 **코드 리뷰가 가능한 상태입니다**
-- [ ] 🎫 **JIRA 티켓이 연결되어 있습니다**
-- [ ] 📝 **커밋 메시지가 명확합니다**
-- [ ] 🔀 **Conflict가 해결되었습니다**
-
-### Frontend (해당하는 경우만)
-- [ ] ✅ **TypeScript 타입 체크 통과** (`yarn build`)
-- [ ] 🧪 **Vitest 테스트 통과** (`yarn test --run`)
-- [ ] 🎨 **ESLint 통과** (`yarn lint`)
-- [ ] 📱 **반응형 디자인 확인 완료**
-- [ ] ♿ **접근성 고려사항 검토 완료**
-
-### Backend (해당하는 경우만)
-- [ ] 🏗️ **Gradle 빌드 성공** (`./gradlew build`)
-- [ ] 🧪 **단위 테스트 통과** (`./gradlew test`)
-- [ ] 🔌 **API 문서 업데이트** (필요시)
-- [ ] 🛡️ **보안 검토 완료** (인증/권한)
-- [ ] 📊 **DB 스키마 변경 검토** (필요시)
-
----
-
-## 📸 스크린샷 / Screenshots
-<!-- UI 변경이 있는 경우 Before/After 스크린샷을 첨부해 주세요 -->
-
-### Before
-<!-- 변경 전 스크린샷 -->
-
-### After
-<!-- 변경 후 스크린샷 -->
-
----
-
-## 🔄 API 변경사항 / API Changes
-<!-- API 변경이 있는 경우 작성해 주세요 -->
-
-### 신규 API
-```
-GET/POST/PUT/DELETE /api/v1/endpoint
-```
-
-### 변경된 API
-```
-기존: GET /api/v1/old-endpoint
-신규: GET /api/v1/new-endpoint
-```
-
-### Request/Response 예시
-```json
-{
-  "example": "data"
-}
-```
-
----
-
-## 🚀 배포 고려사항 / Deployment Notes
-
-### 환경변수 변경
-- [ ] **새로운 환경변수 추가 없음**
-- [ ] **환경변수 변경 사항 있음**
-    - `NEW_ENV_VAR=value`
-
-### 데이터베이스
-- [ ] **DB 마이그레이션 필요 없음**
-- [ ] **DB 마이그레이션 필요함**
-    - 마이그레이션 스크립트:
-
-### 의존성 변경
-- [ ] **새로운 의존성 추가 없음**
-- [ ] **새로운 의존성 추가됨**
-    - Frontend:
-    - Backend:
-
-### 롤백 계획
-<!-- 문제 발생 시 롤백 방법을 설명해 주세요 -->
-- 
-
----
-
-## 👥 리뷰어 / Reviewers
-- [ ] **Frontend 리뷰 필요**: @frontend-reviewer
-- [ ] **Backend 리뷰 필요**: @backend-reviewer
-- [ ] **DevOps 리뷰 필요**: @devops-reviewer
-- [ ] **PM/기획자 확인 필요**: @product-manager
-
----
-
-## 📝 추가 노트 / Additional Notes
-<!-- 리뷰어가 알아야 할 기타 정보를 작성해 주세요 -->
-
-### 참고 문서
-- 
-
-### 관련 PR
-- 
-
-### 후속 작업
-- 
-
----
-
-> 💡 **리뷰어를 위한 팁**
-> - 중요한 변경사항이나 복잡한 로직에는 코드 내 주석으로 설명을 추가했습니다
-> - 특별히 검토가 필요한 부분이 있다면 PR 코멘트로 표시했습니다
+## 추가 노트 / Additional Notes
+<!-- 리뷰어가 알아야 할 참고사항, 후속 작업 등을 자유롭게 작성해 주세요 -->
 ````
 
 ## §4. 툴체인 설치 및 Gradle Wrapper 생성
+
+> **선행 조건**: `gradle wrapper` 실행은 `settings.gradle.kts`·`build.gradle.kts`·`gradle/libs.versions.toml`을 평가한다(버전 카탈로그 해석 + 플러그인 다운로드 포함). 따라서 **§3의 파일이 모두 생성된 후에만** 이 단계를 실행할 수 있다. §3 완료 전에 실행하면 스크립트 평가가 실패한다.
 
 Gradle Wrapper의 `gradle-wrapper.jar`는 바이너리라 이 문서에 담을 수 없다. 아래처럼 생성한다.
 
@@ -1495,6 +1393,19 @@ mise x -- ./gradlew build
 `mise x --`는 mise가 셸에 활성화되지 않은 환경에서도 `mise.toml`의 Java로 실행되게 한다.
 (mise가 셸에 활성화되어 있으면 `./gradlew build`만으로 충분하다.)
 
+### 빌드 전 잔여 플레이스홀더 검증 (§0-7)
+
+빌드에 앞서 치환 누락이 없는지 기계적으로 확인한다.
+
+```bash
+grep -rn "{{" . --exclude-dir=build --exclude-dir=.gradle --exclude-dir=.git
+# 출력이 없어야 정상 (잔여 플레이스홀더 0건). 출력이 있으면 해당 파일의 치환을 마저 수행한 뒤 재검사.
+```
+
+### 재시도 상한
+
+빌드가 실패하면 §6 진단표로 원인을 찾아 수정하고 다시 빌드한다. 단 **진단→수정→재빌드 사이클은 최대 3회**로 제한한다. 3회를 초과해도 `BUILD SUCCESSFUL`에 도달하지 못하면 중단하고, 증상·시도한 조치·마지막 오류 출력을 사용자에게 보고한다(문서 밖의 환경 문제일 수 있다).
+
 ### 기대 결과
 
 1. `BUILD SUCCESSFUL` — 컴파일, PMD(`pmdMain`, 위반 0건), 테스트 모두 통과.
@@ -1529,6 +1440,7 @@ curl -s localhost:8080/sample   # 기대 응답: Hello from Repository
 
 | 증상 | 원인 | 조치 |
 |---|---|---|
+| 컴파일 오류에 `{{` 포함 심볼(예: `cannot find symbol: {{APP_CLASS}}`)이 보임 | 플레이스홀더 치환 누락 | §5의 `grep -rn "{{"`로 잔여 위치를 찾아 §1.1 규칙대로 치환 |
 | 컴파일 오류 `Unmapped target property: "..."` | `unmappedTargetPolicy = ERROR` 정책 하에서 `@Mapping` 오버라이드 누락 — 파일 내용이 문서와 다름 | `SampleMapper`, `SampleEntityMapper`를 §3.23·§3.24 원문과 대조 |
 | 컴파일 오류 `No property named "name" exists` 또는 builder 인식 실패 | annotationProcessor 순서가 깨짐 (lombok-mapstruct-binding이 lombok보다 앞이거나 누락) | `build.gradle.kts`의 annotationProcessor·testAnnotationProcessor 순서를 §3.8과 대조 |
 | 테스트 컴파일 오류 `cannot find symbol: SampleMapperImpl` | testAnnotationProcessor 3종 누락 → 테스트 컴파일 시 매퍼 구현체 미생성 | §3.8의 testAnnotationProcessor 3줄 확인 |
@@ -1555,10 +1467,11 @@ git commit -m "chore: {{PROJECT_NAME}} 프로젝트 초기 설정"
 
 ## 완료 기준 체크리스트
 
-- [ ] §1.2 PROJECT_NAME 유효성 검증 통과
-- [ ] §3의 파일 31개가 트리 구조·내용 그대로 생성됨 (플레이스홀더만 치환)
+- [ ] §1.2 PROJECT_NAME 유효성 검증 통과 및 §1.3 도출값 표 보고·사용자 승인
+- [ ] §3의 파일 31개가 트리 구조·내용 그대로 생성됨 (플레이스홀더만 치환, `PULL_REQUEST_TEMPLATE.md`는 `.github/` 하위)
 - [ ] `ArchitectureTest.java`가 `src/test/java/dev/haja/`에 위치 (BASE_PACKAGE 아님)
 - [ ] §4 wrapper 생성 및 `gradle-wrapper.properties` 덮어쓰기 완료
+- [ ] §5 잔여 플레이스홀더 검증(`grep -rn "{{"`) 0건
 - [ ] `mise x -- ./gradlew build` → `BUILD SUCCESSFUL`, 테스트 12/12 통과, PMD 위반 0건
 - [ ] `build/generated/.../mapper/`에 `SampleMapperImpl`·`SampleEntityMapperImpl`·`ConversionServiceAdapter` 생성 확인
 - [ ] git 최초 커밋 완료, `commit.template` 설정됨, `mise.toml` 미추적

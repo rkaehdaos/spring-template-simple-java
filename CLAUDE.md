@@ -51,4 +51,4 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 
 - Hibernate ORM Gradle 플러그인(`org.hibernate.orm`)이 적용되어 있으나 `hibernate { enhancement {} }` 설정 블록이 없어 bytecode enhancement는 실제로 수행되지 않는다 (빌드된 엔티티 클래스에 `$$_hibernate_` 멤버 없음). enhancement가 필요해지면 `build.gradle.kts`에 해당 블록을 추가할 것.
 - `plans/` 디렉터리에 과거 작업 계획 문서가 있다. 설정 변경의 배경이 궁금할 때 참고.
-- PR 작성 시 저장소 루트의 `PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
+- PR 작성 시 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
