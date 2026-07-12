@@ -44,7 +44,7 @@ dependencies {
     testAnnotationProcessor(libs.lombok)
     testAnnotationProcessor(libs.lombok.mapstruct.binding)
     testAnnotationProcessor(libs.mapstruct.processor)
-    testImplementation(libs.archunit.junit5)
+    testImplementation(libs.archunit)
 }
 
 pmd {
