@@ -33,6 +33,7 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 - `consideringAllDependencies()`를 사용하므로 레이어는 **패키지명 패턴**(`..controller..`, `..service..`, `..repository..`)으로 매칭된다. 레이어에 속하지 않는 새 패키지/클래스 이름에 `controller`·`service`·`repository` 문자열을 넣으면 안 된다 (예: `conversionservice` 패키지는 `..service..`에 매칭되어 규칙 위반이 됨).
 - 레이어 무관 코드는 `dto`, `mapper`처럼 별도 패키지에 둔다.
 - Spring AOT/GraalVM이 생성하는 클래스(`build/classes/java/aot*`)는 검증에서 제외된다.
+- ArchUnit은 `.class` 바이트코드를 런타임에 읽어 분석하므로 `.class` 파일이 없는 GraalVM 네이티브 이미지에서는 동작 불가하다. 따라서 `ArchitectureTest`는 일반 `@Test` + ArchUnit core API 방식으로 작성하고 `@DisabledInNativeImage`로 `nativeTest`에서 제외한다 (ArchUnit 전용 엔진의 `@ArchTest` 방식은 Jupiter 조건부 실행을 평가하지 않아 사용하지 않는다). 의존성은 `archunit-junit5-engine`이 아닌 `archunit`(core)을 쓴다.
 
 ## MapStruct + Lombok 연동
 
