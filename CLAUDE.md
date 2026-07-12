@@ -30,7 +30,7 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 `src/test/java/dev/haja/ArchitectureTest.java`가 레이어드 아키텍처를 강제한다:
 
 - Controller → Service → Repository 단방향 접근만 허용
-- `consideringAllDependencies()`를 사용하므로 레이어는 **패키지명 패턴**(`..controller..`, `..service..`, `..repository..`)으로 매칭된다. 레이어에 속하지 않는 새 패키지/클래스 이름에 `controller`·`service`·`repository` 문자열을 넣으면 안 된다 (예: `conversionservice` 패키지는 `..service..`에 매칭되어 규칙 위반이 됨).
+- `consideringAllDependencies()`를 사용하므로 레이어는 **패키지명 패턴**(`..controller..`, `..service..`, `..repository..`)으로 매칭된다. 패턴은 정확히 그 이름인 패키지 **세그먼트**에만 매칭된다 (예: `foo.service`·`foo.service.bar`는 매칭되지만 `conversionservice`처럼 다른 단어와 붙여 쓴 세그먼트는 매칭되지 않음 — ArchUnit 1.4.2 `PackageMatcher` 실측). 레이어 무관 코드에 `controller`·`service`·`repository`라는 이름의 패키지를 만들면 안 된다.
 - 레이어 무관 코드는 `dto`, `mapper`처럼 별도 패키지에 둔다.
 - Spring AOT/GraalVM이 생성하는 클래스(`build/classes/java/aot*`)는 검증에서 제외된다.
 - ArchUnit은 `.class` 바이트코드를 런타임에 읽어 분석하므로 `.class` 파일이 없는 GraalVM 네이티브 이미지에서는 동작 불가하다. 따라서 `ArchitectureTest`는 일반 `@Test` + ArchUnit core API 방식으로 작성하고 `@DisabledInNativeImage`로 `nativeTest`에서 제외한다 (ArchUnit 전용 엔진의 `@ArchTest` 방식은 Jupiter 조건부 실행을 평가하지 않아 사용하지 않는다). 의존성은 `archunit-junit5-engine`이 아닌 `archunit`(core)을 쓴다.
@@ -49,6 +49,6 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 
 ## 기타
 
-- Hibernate bytecode enhancement 플러그인이 활성화되어 있다 (`hibernate { enhancement {} }`).
+- Hibernate ORM Gradle 플러그인(`org.hibernate.orm`)이 적용되어 있으나 `hibernate { enhancement {} }` 설정 블록이 없어 bytecode enhancement는 실제로 수행되지 않는다 (빌드된 엔티티 클래스에 `$$_hibernate_` 멤버 없음). enhancement가 필요해지면 `build.gradle.kts`에 해당 블록을 추가할 것.
 - `plans/` 디렉터리에 과거 작업 계획 문서가 있다. 설정 변경의 배경이 궁금할 때 참고.
 - PR 작성 시 저장소 루트의 `PULL_REQUEST_TEMPLATE.md` 양식을 따른다.
