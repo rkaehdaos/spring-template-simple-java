@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 스프링 없이 생성된 {@link SampleEntityMapper} 구현체를 직접 사용해 제네릭 EntityMapper 패턴을 검증한다.
  * 제네릭 상속 메서드(toDto/toEntity/list/partialUpdate)가 타입 변수 해석 후 정상 생성되고,
- * {@code @MappingTarget} + {@code NullValuePropertyMappingStrategy.IGNORE}로 부분 갱신이 동작함을 증명한다.
+ * {@code @MappingTarget} + {@code CentralMapperConfig}의 중앙 {@code IGNORE} 정책으로 부분 갱신이 동작함을 증명한다.
  */
 class SampleEntityMapperUnitTest {
 
@@ -70,7 +70,7 @@ class SampleEntityMapperUnitTest {
 
         mapper.partialUpdate(target, patch);
 
-        assertThat(target.getId()).isEqualTo(1L);          // patch.id == null → 유지
+        assertThat(target.getId()).isEqualTo(1L);          // @Mapping(target="id", ignore=true) → 유지
         assertThat(target.getName()).isEqualTo("new-name"); // non-null → 갱신
         assertThat(target.getAge()).isEqualTo(30);          // patch.age == null → 유지
     }
@@ -84,5 +84,18 @@ class SampleEntityMapperUnitTest {
         mapper.partialUpdate(target, patch);
 
         assertThat(target.getAge()).isEqualTo(40);
+    }
+
+    @Test
+    @DisplayName("partialUpdate: DTO에 id가 실려 있어도 엔티티의 기본키는 덮어쓰지 않는다")
+    void partialUpdateNeverOverwritesId() {
+        SampleEntity target = entity(1L, "kai", 30);
+        SampleEntityDto patch = SampleEntityDto.builder().id(7L).fullName("new-name").build();
+
+        mapper.partialUpdate(target, patch);
+
+        assertThat(target.getId()).isEqualTo(1L);            // @Mapping(target="id", ignore=true)
+        assertThat(target.getName()).isEqualTo("new-name");
+        assertThat(target.getAge()).isEqualTo(30);           // patch.age == null → 중앙 IGNORE 정책으로 유지
     }
 }

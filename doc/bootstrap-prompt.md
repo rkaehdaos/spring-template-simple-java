@@ -747,6 +747,7 @@ package {{BASE_PACKAGE}}.mapper;
 import org.mapstruct.InjectionStrategy;
 import org.mapstruct.MapperConfig;
 import org.mapstruct.MappingConstants;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 /**
@@ -757,6 +758,9 @@ import org.mapstruct.ReportingPolicy;
  *     <li>{@code injectionStrategy = CONSTRUCTOR} → uses 매퍼 주입 시 생성자 주입 사용</li>
  *     <li>{@code unmappedTargetPolicy = ERROR} → 매핑 누락을 컴파일 타임 오류로 처리.
  *         의도적으로 무시할 필드는 {@code @Mapping(target = "x", ignore = true)}로 명시해야 한다.</li>
+ *     <li>{@code nullValuePropertyMappingStrategy = IGNORE} → {@code @MappingTarget} 갱신 메서드
+ *         (예: {@code partialUpdate})에서만 적용되며, DTO의 null 필드가 기존 엔티티 값을 지우지 않는다.
+ *         중앙 선언이므로 구체 매퍼가 {@code @BeanMapping}을 재선언할 필요가 없다.</li>
  * </ul>
  * mapstruct-spring-extensions 설정인 {@link MapstructSpringConfig}(@SpringMapperConfig)와는
  * 관심사가 달라 별도 파일로 분리한다.
@@ -764,7 +768,8 @@ import org.mapstruct.ReportingPolicy;
 @MapperConfig(
         componentModel = MappingConstants.ComponentModel.SPRING,
         injectionStrategy = InjectionStrategy.CONSTRUCTOR,
-        unmappedTargetPolicy = ReportingPolicy.ERROR)
+        unmappedTargetPolicy = ReportingPolicy.ERROR,
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface CentralMapperConfig {
 }
 ````
@@ -814,10 +819,9 @@ public interface DtoMapper<E, D> {
 ````java
 package {{BASE_PACKAGE}}.mapper;
 
-import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 
 import java.util.List;
 
@@ -826,9 +830,10 @@ import java.util.List;
  * 부분 갱신을 더한다.
  * <p>
  * <strong>주의</strong>: 구체 매퍼가 여기의 메서드를 {@code @Override}하면 이 인터페이스에 붙은
- * {@link Named}/{@link BeanMapping} 어노테이션은 <em>병합되지 않고 무시된다</em>.
+ * {@link Named}/{@link Mapping} 어노테이션은 <em>병합되지 않고 무시된다</em>.
  * 따라서 비대칭 필드 때문에 {@code partialUpdate}를 오버라이드할 때는 {@code @Named}와
- * {@code @BeanMapping}을 구체 매퍼에서 다시 선언해야 한다.
+ * {@code @Mapping(target = "id", ignore = true)}를 구체 매퍼에서 다시 선언해야 한다.
+ * null 스킵 자체는 {@link CentralMapperConfig}에 중앙 선언되어 있어 재선언이 필요 없다.
  *
  * @param <D> DTO 타입
  * @param <E> 엔티티 타입
@@ -841,11 +846,12 @@ public interface EntityMapper<D, E> extends DtoMapper<E, D> {
 
     /**
      * DTO의 null이 아닌 필드만 기존 엔티티에 덮어써 부분 갱신한다.
-     * null 스킵은 {@code NullValuePropertyMappingStrategy.IGNORE}가 담당하며,
-     * boxed 타입 필드에만 동작한다(primitive는 null이 될 수 없어 항상 복사됨).
+     * null 스킵은 {@link CentralMapperConfig}의 중앙 정책({@code nullValuePropertyMappingStrategy = IGNORE})이
+     * 담당하며, boxed 타입 필드에만 동작한다(primitive는 null이 될 수 없어 항상 복사됨).
+     * {@code id}는 항상 무시하므로 {@code E}는 {@code id} 프로퍼티를 가져야 한다(JPA 엔티티 전제).
      */
     @Named("partialUpdate")
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "id", ignore = true)
     void partialUpdate(@MappingTarget E entity, D dto);
 }
 ````
@@ -885,12 +891,10 @@ package {{BASE_PACKAGE}}.mapper;
 
 import {{BASE_PACKAGE}}.domain.SampleEntity;
 import {{BASE_PACKAGE}}.dto.SampleEntityDto;
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 
 /**
  * {@link EntityMapper}를 구현한 구체 매퍼 데모.
@@ -898,7 +902,7 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * {@code name} ↔ {@code fullName} 비대칭 때문에 {@link CentralMapperConfig}의
  * {@code unmappedTargetPolicy = ERROR} 정책 하에서는 {@code @Mapping} 오버라이드가 필수다
  * (누락 시 컴파일 오류). {@code partialUpdate} 오버라이드는 상위 인터페이스의 어노테이션이
- * 상속되지 않으므로 {@code @Named}/{@code @BeanMapping}까지 다시 선언한다.
+ * 상속되지 않으므로 {@code @Named}와 {@code @Mapping}(id ignore 포함)까지 다시 선언한다.
  * <p>
  * 양방향 매퍼는 단방향 {@code Converter}와 부합하지 않으므로 {@code Converter}는 구현하지 않는다
  * (불필요한 {@code ConversionServiceAdapter} 메서드 생성 방지).
@@ -916,7 +920,7 @@ public interface SampleEntityMapper extends EntityMapper<SampleEntityDto, Sample
 
     @Override
     @Named("partialUpdate")
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "id", ignore = true)
     @Mapping(source = "fullName", target = "name")
     void partialUpdate(@MappingTarget SampleEntity entity, SampleEntityDto dto);
 }
@@ -1061,7 +1065,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 스프링 없이 생성된 {@link SampleEntityMapper} 구현체를 직접 사용해 제네릭 EntityMapper 패턴을 검증한다.
  * 제네릭 상속 메서드(toDto/toEntity/list/partialUpdate)가 타입 변수 해석 후 정상 생성되고,
- * {@code @MappingTarget} + {@code NullValuePropertyMappingStrategy.IGNORE}로 부분 갱신이 동작함을 증명한다.
+ * {@code @MappingTarget} + {@code CentralMapperConfig}의 중앙 {@code IGNORE} 정책으로 부분 갱신이 동작함을 증명한다.
  */
 class SampleEntityMapperUnitTest {
 
@@ -1119,7 +1123,7 @@ class SampleEntityMapperUnitTest {
 
         mapper.partialUpdate(target, patch);
 
-        assertThat(target.getId()).isEqualTo(1L);          // patch.id == null → 유지
+        assertThat(target.getId()).isEqualTo(1L);          // @Mapping(target="id", ignore=true) → 유지
         assertThat(target.getName()).isEqualTo("new-name"); // non-null → 갱신
         assertThat(target.getAge()).isEqualTo(30);          // patch.age == null → 유지
     }
@@ -1133,6 +1137,19 @@ class SampleEntityMapperUnitTest {
         mapper.partialUpdate(target, patch);
 
         assertThat(target.getAge()).isEqualTo(40);
+    }
+
+    @Test
+    @DisplayName("partialUpdate: DTO에 id가 실려 있어도 엔티티의 기본키는 덮어쓰지 않는다")
+    void partialUpdateNeverOverwritesId() {
+        SampleEntity target = entity(1L, "kai", 30);
+        SampleEntityDto patch = SampleEntityDto.builder().id(7L).fullName("new-name").build();
+
+        mapper.partialUpdate(target, patch);
+
+        assertThat(target.getId()).isEqualTo(1L);            // @Mapping(target="id", ignore=true)
+        assertThat(target.getName()).isEqualTo("new-name");
+        assertThat(target.getAge()).isEqualTo(30);           // patch.age == null → 중앙 IGNORE 정책으로 유지
     }
 }
 ````
@@ -1280,10 +1297,10 @@ PMD(7.24.0) 정적 분석이 활성화되어 있다. 커스텀 룰셋 `.github/p
 이 프로젝트의 핵심 설정이며 깨지기 쉬운 부분:
 
 - **Annotation processor 순서가 중요**: `lombok` → `lombok-mapstruct-binding` → `mapstruct-processor`. `build.gradle.kts`의 main/test 양쪽 모두 이 순서를 유지해야 MapStruct가 Lombok 생성 getter/builder를 인식한다.
-- 매퍼 정책은 `mapper/CentralMapperConfig.java`의 `@MapperConfig`로 중앙화한다(`componentModel = SPRING`, `injectionStrategy = CONSTRUCTOR`, **`unmappedTargetPolicy = ERROR`**). 각 매퍼는 `@Mapper(config = CentralMapperConfig.class)`로 상속받는다. ERROR 정책이므로 매핑 누락은 컴파일 오류이며, 의도적으로 무시할 필드는 `@Mapping(target = "x", ignore = true)`로 명시해야 한다. `@MapperConfig`(mapstruct-processor)와 `@SpringMapperConfig`(mapstruct-spring-extensions)는 관심사가 달라 별도 파일로 유지한다.
+- 매퍼 정책은 `mapper/CentralMapperConfig.java`의 `@MapperConfig`로 중앙화한다(`componentModel = SPRING`, `injectionStrategy = CONSTRUCTOR`, **`unmappedTargetPolicy = ERROR`**, `nullValuePropertyMappingStrategy = IGNORE`). 각 매퍼는 `@Mapper(config = CentralMapperConfig.class)`로 상속받는다. ERROR 정책이므로 매핑 누락은 컴파일 오류이며, 의도적으로 무시할 필드는 `@Mapping(target = "x", ignore = true)`로 명시해야 한다. `nullValuePropertyMappingStrategy = IGNORE`는 `@MappingTarget` 갱신 메서드(예: `partialUpdate`)에만 적용되어, DTO의 null 필드가 기존 값을 지우지 않는다. `@MapperConfig`(mapstruct-processor)와 `@SpringMapperConfig`(mapstruct-spring-extensions)는 관심사가 달라 별도 파일로 유지한다.
 - `mapper/MapstructSpringConfig.java`의 `@SpringMapperConfig`가 adapter 생성 위치를 결정한다. 이 클래스가 mapper 패키지(컴포넌트 스캔 범위 안)에 있어야 adapter가 빈으로 등록된다 — 삭제/이동 금지.
-- 제네릭 매퍼 계층: `mapper/DtoMapper<E, D>`(읽기 전용: toDto)와 이를 상속하는 `mapper/EntityMapper<D, E>`(양방향: toEntity + `@Named("partialUpdate")` 부분 갱신). 구체 매퍼는 `SampleEntityMapper`(엔티티 ↔ DTO 양방향, non-Converter)와 `SampleMapper`(Converter 구현, mapstruct-spring-extensions adapter 증명용)로 나뉜다.
-- **오버라이드 시 어노테이션 비상속 주의**: 비대칭 필드(예: `name` ↔ `fullName`) 때문에 제네릭 메서드를 `@Override`하면 상위 인터페이스의 `@Named`/`@BeanMapping`이 병합되지 않는다. `partialUpdate` 오버라이드에서 `@Named`/`@BeanMapping(...IGNORE)`/`@Mapping`을 모두 다시 선언해야 한다. `partialUpdate`의 null 스킵은 boxed 타입 필드에만 동작하므로 `SampleEntityDto.age`는 `Integer`를 쓴다.
+- 제네릭 매퍼 계층: `mapper/DtoMapper<E, D>`(읽기 전용: toDto)와 이를 상속하는 `mapper/EntityMapper<D, E>`(양방향: toEntity + `@Named("partialUpdate")` 부분 갱신, `id`는 항상 `@Mapping(target = "id", ignore = true)`로 무시). 구체 매퍼는 `SampleEntityMapper`(엔티티 ↔ DTO 양방향, non-Converter)와 `SampleMapper`(Converter 구현, mapstruct-spring-extensions adapter 증명용)로 나뉜다.
+- **오버라이드 시 어노테이션 비상속 주의**: 비대칭 필드(예: `name` ↔ `fullName`) 때문에 제네릭 메서드를 `@Override`하면 상위 인터페이스의 `@Named`/`@Mapping`이 병합되지 않는다. `partialUpdate` 오버라이드에서 `@Named`와 **`@Mapping(target = "id", ignore = true)`를 반드시** 다시 선언해야 한다(누락 시 관리 중인 엔티티의 기본키가 patch DTO의 id로 덮어써진다). null 스킵 전략은 `CentralMapperConfig`에 중앙 선언되어 있어 `@BeanMapping` 재선언은 불필요하다. `partialUpdate`의 null 스킵은 boxed 타입 필드에만 동작하므로 `SampleEntityDto.age`는 `Integer`를 쓴다.
 - Lombok binding 검증을 위해 매핑 대상 모델은 record가 아닌 Lombok 클래스를 쓴다: 불변 모델은 `@Getter`/`@Builder`(getter/builder 방향), JPA 엔티티 `domain/SampleEntity`는 `@Getter`/`@Setter`/`@NoArgsConstructor`(setter 방향 binding + `@MappingTarget` 부분 갱신 지원). 엔티티는 identity 함정 회피를 위해 `@Data`/`@EqualsAndHashCode`/`@Builder`를 쓰지 않는다.
 - 연동 검증 테스트: `SampleMapperUnitTest`·`SampleEntityMapperUnitTest`(스프링 없이 processor/binding·partialUpdate 검증), `MapstructSpringIntegrationTest`(빈 등록·ConversionService 자동 등록·config 상속 검증).
 
@@ -1409,12 +1426,12 @@ grep -rn "{{" . --exclude-dir=build --exclude-dir=.gradle --exclude-dir=.git
 ### 기대 결과
 
 1. `BUILD SUCCESSFUL` — 컴파일, PMD(`pmdMain`, 위반 0건), 테스트 모두 통과.
-2. 테스트 **12개 전부 통과** (`passed`):
+2. 테스트 **13개 전부 통과** (`passed`):
 
 | 테스트 클래스 | 개수 | 증명하는 것 |
 |---|---|---|
 | `SampleMapperUnitTest` | 1 | MapStruct가 Lombok getter/builder 인식 (processor 순서·binding) |
-| `SampleEntityMapperUnitTest` | 5 | 제네릭 EntityMapper 상속, setter 방향 binding, partialUpdate null 스킵 |
+| `SampleEntityMapperUnitTest` | 6 | 제네릭 EntityMapper 상속, setter 방향 binding, partialUpdate null 스킵, @Id 보호 |
 | `MapstructSpringIntegrationTest` | 4 | 매퍼 빈 등록, ConversionServiceAdapter 생성·등록, config 상속 |
 | `{{APP_CLASS}}Tests` | 1 | 스프링 컨텍스트 로드 (JPA + H2 포함) |
 | `ArchitectureTest` | 1 | Controller → Service → Repository 레이어 규칙 |
